@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+
+# Temp and clean repos
+clean_repo/
+temp_repo/
