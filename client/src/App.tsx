@@ -13,7 +13,7 @@ import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import Cart from "@/pages/Cart";
 import NotFound from "@/pages/not-found";
-
+const API_URL = "https://worldmapx-backend.onrender.com";
 function Router() {
   return (
     <Layout>
