@@ -4,6 +4,8 @@ import {
   products, type Product, type InsertProduct,
   blogPosts, type BlogPost, type InsertBlogPost
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, and, SQL } from "drizzle-orm";
 
 // Extend the interface with any CRUD methods needed
 export interface IStorage {
@@ -402,4 +404,145 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+
+
+export class DatabaseStorage implements IStorage {
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+  
+  // Category methods
+  async getCategories(): Promise<Category[]> {
+    return db.select().from(categories).orderBy(categories.order);
+  }
+  
+  async getCategoryBySlug(slug: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.slug, slug));
+    return category || undefined;
+  }
+  
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const [category] = await db
+      .insert(categories)
+      .values(insertCategory)
+      .returning();
+    return category;
+  }
+  
+  // Product methods
+  async getProducts(options?: {
+    featured?: boolean,
+    isNew?: boolean,
+    categoryId?: number,
+    categorySlug?: string,
+    limit?: number,
+  }): Promise<Product[]> {
+    let query = db.select().from(products);
+    
+    const conditions = [];
+    
+    // Filter by category ID
+    if (options?.categoryId) {
+      conditions.push(eq(products.categoryId, options.categoryId));
+    }
+    
+    // Filter by category slug
+    if (options?.categorySlug) {
+      const [category] = await db.select().from(categories)
+        .where(eq(categories.slug, options.categorySlug));
+      
+      if (category) {
+        conditions.push(eq(products.categoryId, category.id));
+      }
+    }
+    
+    // Filter by featured
+    if (options?.featured !== undefined) {
+      conditions.push(eq(products.featured, options.featured));
+    }
+    
+    // Filter by isNew
+    if (options?.isNew !== undefined) {
+      conditions.push(eq(products.isNew, options.isNew));
+    }
+    
+    // Apply all conditions
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    // Apply limit
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    return query;
+  }
+  
+  async getProductBySlug(slug: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.slug, slug));
+    return product || undefined;
+  }
+  
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const [product] = await db
+      .insert(products)
+      .values(insertProduct)
+      .returning();
+    return product;
+  }
+  
+  // Blog posts methods
+  async getBlogPosts(options?: {
+    limit?: number,
+    published?: boolean,
+  }): Promise<BlogPost[]> {
+    let query = db.select().from(blogPosts);
+    
+    // Filter by published
+    if (options?.published !== undefined) {
+      query = query.where(eq(blogPosts.published, options.published));
+    }
+    
+    // Sort by date (newest first)
+    query = query.orderBy(desc(blogPosts.createdAt));
+    
+    // Apply limit
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    return query;
+  }
+  
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug));
+    return post || undefined;
+  }
+  
+  async createBlogPost(insertBlogPost: InsertBlogPost): Promise<BlogPost> {
+    const [post] = await db
+      .insert(blogPosts)
+      .values(insertBlogPost)
+      .returning();
+    return post;
+  }
+}
+
+// Switch from memory storage to database storage
+export const storage = new DatabaseStorage();
